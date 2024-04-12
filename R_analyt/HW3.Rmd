@@ -1,0 +1,480 @@
+---
+title: "HW3"
+output: html_document
+date: "2024-03-05"
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r message=FALSE}
+library(tidyverse) 
+```
+
+## 1. Универсальные лингвические иерархии: порядок прилагательных в новогреческом языке (стандартный и кипрский диалекты)  
+
+[Данные](https://raw.githubusercontent.com/olesar/2023dav4compling/main/data/greek-word-order-mono_translit.txt) (социолингвистическая анкета и результаты эксперимента в одном файле) взяты, с адаптацией, из исследования:
+Leivada, Evelina; Westergaard, Marit, 2019, [Universal linguistic hierarchies are not innately wired](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6679903/pdf/peerj-07-7438.pdf). PeerJ, v.7.
+
+Источник данных: репозиторий TROLLing:
+Leivada, Evelina; Westergaard, Marit, 2019, "Replication Data for: Universal linguistic hierarchies are not innately wired", https://doi.org/10.18710/NTLLUF, DataverseNO, V1
+
+#### Конструкции с двумя прилагательными
+
+В английском языке порядок двух прилагательных в таких фразах, как:
+```
+ a big black bag # хорошо
+*a black big bag # неприемлемо, грамматически неправильно или семантически аномально
+```
+определяется семантическим классом прилагательного (например, прилагательное «цвета» ближе к существительному, чем прилагательное «размера»).
+
+Синтаксическая иерархия близости к существительному в универсальной грамматике Хомского предполагает следующий порядок, который считается врожденным и универсальным (= действительным для всех языков).
+
+```
+Subjective Comment > Evidential > Size > Length
+> Height > Speed > Depth > Width > Temperature > Wetness > Age
+> Shape > Color > Nationality/Origin > Material 
+# (на основе Scott, 2002: 114)
+```
+
+Цель исследования Leivada & Westergaard — определить, что происходит, когда люди воспринимают примеры с порядком, который либо соответствует иерархии, либо нарушает ее.
+
+#### Метод
+
+В первом эксперименте 140 нейротипичных взрослых носителей языка выполнили задание с выбором на время (a timed forced choice task), в котором использовались стимулы, представляющие комбинацию двух прилагательных и конкретного существительного (например, *Έπια ένα στενό ισπανικό βρασιόλι.* 'I bought a narrow Spanish bracelet.'). Были собраны данные двух типов:
+
+(i) суждения о приемлемости по 3-балльной шкале Ликерта:
+     1. неправильно,
+     2. ни правильно, ни неправильно,
+     3. правильный;
+
+(ii) время реакции (RT).
+
+В стимулах использовались три условия:  
+1. прилагательное размера > прилагательное национальности, 
+2. прилагательное цвета > прилагательное формы,  
+3. прилагательное субъективного комментария > прилагательное материала. 
+
+Каждое условие предъявлялось в двух вариантах порядка слов. При конгруэнтном порядке расположение пары прилагательных соответствовало тому, что диктует универсальная иерархия. В неконгруэнтном порядке порядок был обратным, поэтому иерархия была нарушена.
+
+Во втором эксперименте 30 билингвов (носителей стандартного и кипрского греческого) были протестированы на обоих диалектах, по 36 наблюдений на участника, по 18 на каждый вариант.
+
+В обоих экспериментах использовались два типа [филлеров] (https://www.hlp.rochester.edu/resources/BCS152-Tutorial/Fillers.html): FillerAcceptable и FillerUnacceptable — предложения, которые включали правильно построенные и неграмматические структуры, соответственно. В обеих задачах соотношение наполнителей к реальным тестовым структурам составляло 2:1. Смотри также [ключи к данным](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6679903/bin/peerj-07-7438-s001.txt).
+
+#### Данные
+
+Загрузите данные из файла в переменную mono, переведя строковые данные в факторы. В переменной mono_socio сохраните данные социолингвистической анкеты. В переменной mono оставьте только данные самого эксперимента. Переименуйте заголовки в последней таблице в следующие: "ParticipantID", "QuestionType", "NQuestions", "Likert", "RT".
+
+```{r}
+library(ggplot2)
+library(tidyverse)
+
+library(rstatix)
+library(ez)
+```
+
+
+
+```{r}
+mono <- read.table(file = 'https://raw.githubusercontent.com/olesar/2023dav4compling/main/data/greek-word-order-mono_translit.txt', header = TRUE, sep = ";", stringsAsFactors = TRUE)
+
+mono_socio <- subset(mono, type.of.question == "Form")
+mono_socio$reaction.times.in.milliseconds <- as.character(mono_socio$reaction.times.in.milliseconds)
+mono_socio$reaction.times.in.milliseconds <- as.factor(mono_socio$reaction.times.in.milliseconds)
+
+mono <- subset(mono, type.of.question == 'AcceptabilityJudgment')
+
+mono <- mono[, !colnames(mono) %in% c("X")]
+mono$reaction.times.in.milliseconds <- as.integer(mono$reaction.times.in.milliseconds)
+colnames(mono) <- c("ParticipantID", "QuestionType", "NQuestions", "Likert", "RT")
+```
+
+
+```{r}
+congruent_values <- rep(rep(c("Congruent", "Incongruent"), each = 3), length.out = nrow(mono))
+mono <- mutate(mono, Order = congruent_values)
+mono$Order <- as.factor(mono$Order)
+
+conditions_values <- rep(rep(c("size/nat", "shape/col", "subj/mat" ), each = 6), length.out = nrow(mono))
+mono <- mutate(mono, Condition = conditions_values)
+mono$Condition <- as.factor(mono$Condition)
+```
+
+```{r}
+head(mono)
+```
+
+```{r}
+colnames(mono_socio) <- c("ParticipantID", "QuestionType", "NQuestions", "intro", "participant_data_name", "participant_data_value")
+head(mono_socio)
+```
+
+```{r}
+mono_socio_wider <- mono_socio %>%
+  pivot_wider(names_from="participant_data_name",
+              values_from="participant_data_value")
+mono_socio_wider
+```
+
+
+
+
+
+
+## Описание данных
+
+### 1.1
+
+Взглянем на данные, чтобы ответить на следующие вопросы о социолингвистических характеристиках испытуемых: 
+
+1. Сколько участников указано в датафрейме?
+
+2. Сколько из них женщин и мужчин?
+
+3. Какие уровни образования указаны в датафрейме?
+
+4. Сколько участников каждого уровня образования?
+
+5. Сколько леворуких и праворуких участников?
+
+Напишите код, представляющий ответы на эти вопросы в виде одной или нескольких таблиц. 
+Используйте функции из пакета tidyverse: `filter`, `group_by`, `count` and `distinct`. 
+(Еще один способ - использовать `pivot_wider`.)
+
+```{r 1.1}
+# сколько участников указано в датафрейме?
+count(distinct(mono, ParticipantID))
+
+# сколько из них женщин и мужчин?
+mono_socio_wider %>%
+  group_by(sex) %>%
+  summarize(count = n())
+
+# Какие уровни образования указаны в датафрейме?
+mono_socio_wider %>%
+  distinct(education)
+
+# Сколько участников каждого уровня образования?
+mono_socio_wider %>%
+  group_by(education) %>%
+  summarize(count = n())
+
+
+# Сколько леворуких и праворуких участников?
+mono_socio_wider %>%
+  group_by(handedness) %>%
+  summarize(count = n())
+
+
+```
+
+### 1.2
+
+Постройте график плотности, который показывает распределение RT в эксперименте в целом (для всех участников и условий. Отобразите красным пунктиром линию, показывающую среднее значение RT. 
+
+
+```{r 1.2}
+ggplot(data=mono, aes(x=RT, group=Condition, fill=Condition)) +
+  geom_density(alpha = 0.5) +
+  geom_vline(xintercept = mean(mono$RT),
+             color="red",
+             lty=2
+             )
+```
+
+### 1.3
+
+Верно ли, что данные времени реакции нормально распределены? Есть ли в распределении длинные левые или правые хвосты?? 
+
+```
+Нет, не верно. Пик смещен в лево, хвостов нет.
+```
+
+### 1.4
+
+Преобразуйте данные с помощью функциии логарифма (RTlog = log10(RT)).
+
+```{r 1.4}
+mono$RTlog <- log10(mono$RT)
+head(mono)
+```
+
+### 1.5
+
+Создайте график, похожий на 1.3, но показывающий логарифимированные значения RT. 
+
+```{r 1.5}
+ggplot(data=mono, aes(x=RTlog, group=Condition, fill=Condition)) +
+  geom_density(alpha = 0.5) +
+  geom_vline(xintercept = mean(mono$RTlog),
+             color="red",
+             lty=2
+             )
+```
+
+### 1.6
+
+Отфильтруйте выбросы:  
+* автоматические ответы, время реакции на которые меньше 600 ms (будем полагать, что кнопка была нажата слишком быстро, еще до того, как у участника было достаточно времени рассмотреть показанный ему стимул и принять решение);  
+* ответы, в которых RTlog отличается от среднего значения RTlog более, чем на 3 стандартных отклонения (SD);  
+* филлеры (как приемлемые, так и неприемлемые).  
+Сохраните очищенные от выбросов данные в переменную `mono1`.
+
+```{r}
+mono1 <- mono %>%
+          filter(RT > 600,
+                 RTlog >= mean(RTlog) - sd(RTlog) & RTlog <= mean(RTlog) + sd(RTlog),
+                 NQuestions <= 98)
+mono1$Likert[mono1$Likert == "Neither correct nor wrong"] <- "Neither"
+head(mono1)
+```
+
+
+Воспроизведите графики типа показанных на Рис. 1-7 в статье, используя пакет `ggplot2`. 
+Визуально, как по оформлению, так и по отображаемым значениям, они могут отличаться от приведенных в статье (наши данные могут не во всем соответствовать тем, что использовали авторы в статье).  
+
+### 1.7.1
+
+Рисунок 1
+
+```{r 1.7.1}
+ggplot(data=mono1,
+       aes(x=Condition,
+           color=Likert,
+           fill=Likert)
+       ) +
+  geom_bar(position="dodge") +
+  facet_wrap(~Order, scales="free")
+  
+
+```
+
+### 1.7.2
+
+Рисунок 2
+
+```{r 1.7.2}
+
+ggplot(data=mono1,
+       aes(x=Order,
+           color=Likert,
+           fill=Likert
+           )
+       ) +
+  geom_bar(position="dodge")
+
+
+```
+
+### 1.7.3
+
+Рисунок 3
+
+```{r 1.7.3}
+
+ggplot(data=mono1,
+       aes(x=Order,
+           y=RTlog,
+           color=Condition,
+           fill=Condition)
+       ) +
+  geom_boxplot()
+
+```
+
+### 1.7.4
+
+Рисунок 4
+
+```{r 1.7.4}
+ggplot(data=mono1,
+       aes(x=Order,
+           y=RT,
+           color=Condition,
+           fill=Condition)
+       ) +
+  geom_boxplot()
+
+```
+
+### 1.7.5
+
+Рисунок 5
+
+```{r 1.7.5}
+ggplot(data=mono1,
+       aes(x=Order,
+           y=RTlog)
+       ) +
+  geom_boxplot()
+
+```
+
+### 1.7.6
+
+Рисунок 6
+
+```{r 1.7.6}
+
+ggplot(data=mono1,
+       aes(x=Order,
+           y=RT)
+       ) +
+  geom_boxplot()
+
+```
+
+### 1.7.7
+
+Рисунок 7
+
+```{r 1.7.7}
+
+ggplot(data=mono1,
+       aes(x=Order,
+           y=RTlog,
+           color=Order
+           )
+       ) +
+  geom_violin(width=1,
+              position=position_dodge(.9)) +
+  geom_boxplot(position=position_dodge(.9),
+               width=.3,
+               alpha=.2) +
+  facet_wrap(~Likert)
+
+```
+
+
+### 1.8
+
+T-test. Проанализируйте разницу в среднем значении RTlog, сгруппировав данные по порядку слов в стимуле (конгруэнтный vs неконгруэнтный). Сформулируйте нулевую и альтернативную гипотезу, аргументируйте, какой тип t-test'а следует применить, сделайте статистический и содержательный вывод о значимости различия.  
+
+```
+H0: Среднее значение RTlog НЕ зависит от Порядка (Order)
+
+H1: Среднее значение RTlog НЕ зависит от Порядка (Order) 
+
+Первая мысль - использоваться t.test для независимых выборок. Однако, наши данные нарушают допущение о нормальном распределении. Поэтому я выполнил непараметрический тест
+Результат: H0 - верна
+```
+
+```{r}
+shapiro.test(mono1$RTlog) # p-value < 0.05, то есть данные не нормально распределены. нужен непараметрический тест
+```
+
+```{r}
+wilcox.test(RTlog ~ Order, 
+            data = mono1) # p-value > 0.05, нулевая гипотеза не отвергается
+```
+
+
+
+### 1.9
+
+ANOVA. Проанализируйте разницу в среднем значении RTlog, сгруппировав данные по трем условиям 
+(прилагательное размера > прилагательное национальности, прилагательное цвета > прилагательное формы, прилагательное субъективного комментария > прилагательное материала) и по участнику. Сформулируйте нулевую и альтернативную гипотезу, аргументируйте, какой тип дисперсионного анализа следует применить, сделайте статистический и содержательный вывод о значимости различия. Это задание выполняется только для ответов при порядке слов Incongruent.  
+
+```
+
+H0: Условия (Conditions) НЕ влияют на среднее значение RTlog для всех участников
+
+H1: Условия (Conditions) влияют на среднее значение RTlog для всех участников
+
+Мы использовали two-way ANOVA, потому что нас интересуют два фактора.
+Результат показал, что:
+Разные условия не оказываются какого-либо эффекта, потому что p-value > 0.05
+Однако участники — оказывают. Их p-value  сильно ниже 0
+
+```
+
+
+
+
+```{r 1.9}
+mono_for_aov <- mono1 %>%
+                filter(Order == "Incongruent")
+
+anova_model <- aov(RTlog ~ Condition + ParticipantID, data = mono_for_aov)
+anova_model
+
+summary(anova_model)
+```
+
+
+
+### 1.10  
+
+Post-hoc тест. Примените TukeyHSD тест, чтобы выяснить, какие конкретно пары условий TypeOfStimuli отличаются друг от друга по среднему значению RTlog.  
+Это задание, аналогично, выполняется только для ответов при порядке слов Incongruent.  
+
+```{r 1.10}
+TukeyHSD(anova_model, "Condition")
+```
+
+Запишите ниже интерпретацию post-hoc теста.  
+
+```
+Во всех трёх случаях p-value выше 0.05, поэтому ни одно из условий не оказывает какого-либо влияния
+
+```
+
+## 2. Тест хи-квадрат и его аналоги (ваши данные)  
+
+Найдите в публичных репозиториях (OSF, kaggle, Trolling, https://datasetsearch.research.google.com и т. д.) или возьмите ваши собственные данные, подходящие для проведения теста на (не)зависимость двух номинальных переменных. Данные должны быть лингвистическими, личные данные могут быть из курсовой, диплома, экспедиций, ваших исследовательских проектов и т. п. Вы можете модифицировать как общедоступные чужие, так и собственные данные.  
+
+### 2.1 
+
+Сформулируйте нулевую и альтернативную гипотезы
+
+```
+H0: Точность ответа (ACC) НЕ зависит от объекта (Object.En)
+H1: Точность ответа (ACC) зависит от объекта (Object.En)
+
+```
+
+### 2.2 
+
+Выложите файл с данными в свой репозиторий/облако. Прочитайте данные, дав на них ссылку URL. Постройте таблицу сопряженности.   
+
+```{r 2.2}
+# ссылка на статью: https://www.nature.com/articles/s41597-024-03022-8
+chinese_data <- read.table(file="https://raw.githubusercontent.com/XvKuoMing/linguistic_data/main/chinese_beh_prod_data/Raw%20data.csv", header=TRUE, sep=",", stringsAsFactors=TRUE)
+chinese_data$ACC[chinese_data$ACC == 0] <- "Wrong"
+chinese_data$ACC[chinese_data$ACC == -1] <- "Neither"
+chinese_data$ACC[chinese_data$ACC == 1] <- "Correct"
+head(chinese_data)
+```
+
+
+
+
+### 2.3
+
+Проведите анализ, аргументировав выбор статистического теста. Сформулируйте статистический и содержательный вывод о значимости. Проведите анализ величины эффекта (если необходимо). Проведите post-hoc тест(ы) (если необходимо).
+
+```
+Так как мы имеем дело с двумя категориальными переменными, то мы используем хи-квадрат.
+Его результат дал нам p-value < 0.05, поэтому мы отвергаем нулевую гипотезу
+```
+
+
+```{r 2.3}
+chinese_tab <- chinese_data %>%
+  select(Object.En, ACC) %>%
+  table()
+chisq.test(chinese_tab)
+```
+
+
+
+
+
+
+
+
+
