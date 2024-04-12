@@ -1,2 +1,2 @@
 # linguistic_data
-various linguistic data for my research
+various linguistic analysis in R
